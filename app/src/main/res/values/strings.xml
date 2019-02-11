@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Map Application</string>
+    <string name="title_activity_maps">Map</string>
+    <string name="enter_start_destination">Enter Start Destination</string>
+    <string name="enter_end_distination">Enter end distination</string>
+</resources>
