@@ -1,20 +1,39 @@
 package com.example.mapapplication;
 
+import android.app.ProgressDialog;
+import android.content.Context;
 import android.graphics.Color;
 import android.location.Address;
+import android.location.Criteria;
 import android.location.Geocoder;
+import android.location.Location;
+import android.location.LocationManager;
+import android.os.AsyncTask;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Toast;
 
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.maps.android.PolyUtil;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,7 +42,7 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
     private EditText startDest;
     private EditText endDest;
     private Button search;
-    private final static String LINE = "rvumEis{y[}DUaBGu@EqESyCMyAGGZGdEEhBAb@DZBXCPGP]Xg@LSBy@E{@SiBi@wAYa@AQGcAY]I]KeBm@_Bw@cBu@ICKB}KiGsEkCeEmBqJcFkFuCsFuCgB_AkAi@cA[qAWuAKeB?uALgB\\eDx@oBb@eAVeAd@cEdAaCp@s@PO@MBuEpA{@R{@NaAHwADuBAqAGE?qCS[@gAO{Fg@qIcAsCg@u@SeBk@aA_@uCsAkBcAsAy@AMGIw@e@_Bq@eA[eCi@QOAK@O@YF}CA_@Ga@c@cAg@eACW@YVgDD]Nq@j@}AR{@rBcHvBwHvAuFJk@B_@AgAGk@UkAkBcH{@qCuAiEa@gAa@w@c@o@mA{Ae@s@[m@_AaCy@uB_@kAq@_Be@}@c@m@{AwAkDuDyC_De@w@{@kB_A}BQo@UsBGy@AaA@cLBkCHsBNoD@c@E]q@eAiBcDwDoGYY_@QWEwE_@i@E}@@{BNaA@s@EyB_@c@?a@F}B\\iCv@uDjAa@Ds@Bs@EyAWo@Sm@a@YSu@c@g@Mi@GqBUi@MUMMMq@}@SWWM]C[DUJONg@hAW\\QHo@BYIOKcG{FqCsBgByAaAa@gA]c@I{@Gi@@cALcEv@_G|@gAJwAAUGUAk@C{Ga@gACu@A[Em@Sg@Y_AmA[u@Oo@qAmGeAeEs@sCgAqDg@{@[_@m@e@y@a@YIKCuAYuAQyAUuAWUaA_@wBiBgJaAoFyCwNy@cFIm@Bg@?a@t@yIVuDx@qKfA}N^aE@yE@qAIeDYaFBW\\eBFkANkANWd@gALc@PwAZiBb@qCFgCDcCGkCKoC`@gExBaVViDH}@kAOwAWe@Cg@BUDBU`@sERcCJ{BzFeB";
+    private ProgressDialog dialog;
 
     @Override
     protected void initViews() {
@@ -35,11 +54,24 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
 
     @Override
     protected void startDemo() {
-        List<LatLng> decodedPath = PolyUtil.decode(LINE);
+        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        Criteria criteria = new Criteria();
 
-        getMap().addPolyline(new PolylineOptions().addAll(decodedPath));
+        Location location = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, false));
+        if (location != null)
+        {
+            LatLng current = new LatLng(location.getLatitude(), location.getLongitude());
+            getMap().animateCamera(CameraUpdateFactory.newLatLngZoom(current, 13));
 
-        getMap().moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(-33.8256, 151.2395), 12));
+            CameraPosition cameraPosition = new CameraPosition.Builder()
+                    .target(new LatLng(location.getLatitude(), location.getLongitude()))      // Sets the center of the map to location user
+                    .zoom(15)                   // Sets the zoom
+                    .bearing(0)                // Sets the orientation of the camera to east
+                    .tilt(40)                   // Sets the tilt of the camera to 30 degrees
+                    .build();                   // Creates a CameraPosition from the builder
+            getMap().animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+            getMap().addMarker(new MarkerOptions().position(current));
+        }
     }
 
     @Override
@@ -75,12 +107,7 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
                 }
 
                 if(!TextUtils.isEmpty(startDest.getText().toString()) && !TextUtils.isEmpty(endDest.getText().toString())){
-
-                    String url = getMap().
-                    //PolylineOptions opts = new PolylineOptions().addAll(path).color(Color.BLUE).width(5);
-                    //getMap().addPolyline(opts);
-                    //List<LatLng> decodedPath = PolyUtil.encode(PolyUtil.decode(path));
-                    //getMap().addPolyline(new PolylineOptions().addAll(decodedPath));
+                    new GetDirection(startDest.getText().toString(),endDest.getText().toString()).execute();
                 }
                 break;
         }
@@ -96,5 +123,138 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
             latLong[1] = address.getLongitude();
         }
         return latLong;
+    }
+
+
+    class GetDirection extends AsyncTask<String, String, String> {
+
+        private final String origin;
+        private final String dest;
+        private List<LatLng> pontos;
+
+        GetDirection(String origin, String dest) {
+            this.origin = origin;
+            this.dest = dest;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            dialog = new ProgressDialog(PolyDecodeDemoActivity.this);
+            dialog.setMessage("Drawing the route, please wait!");
+            dialog.setIndeterminate(false);
+            dialog.setCancelable(false);
+            dialog.show();
+        }
+
+        protected String doInBackground(String... args) {
+            String stringUrl = "https://maps.googleapis.com/maps/api/directions/json?origin=" + origin+ "&destination=" + dest+ "&sensor=false&key=AIzaSyCT_UViYC4cKOUp5vsWOFn34O0jqWGvjE8";
+            StringBuilder response = new StringBuilder();
+            try {
+                URL url = new URL(stringUrl);
+                HttpURLConnection httpconn = (HttpURLConnection) url
+                        .openConnection();
+                if (httpconn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                    BufferedReader input = new BufferedReader(
+                            new InputStreamReader(httpconn.getInputStream()),
+                            8192);
+                    String strLine = null;
+
+                    while ((strLine = input.readLine()) != null) {
+                        response.append(strLine);
+                    }
+                    input.close();
+                }
+
+                String jsonOutput = response.toString();
+
+                JSONObject jsonObject = new JSONObject(jsonOutput);
+
+                // routesArray contains ALL routes
+                JSONArray routesArray = jsonObject.getJSONArray("routes");
+                // Grab the first route
+                JSONObject route = routesArray.getJSONObject(0);
+
+                JSONObject poly = route.getJSONObject("overview_polyline");
+                String polyline = poly.getString("points");
+                pontos = decodePoly(polyline);
+
+            } catch (Exception e) {
+                dialog.dismiss();
+                e.printStackTrace();
+            }
+
+            return null;
+
+        }
+
+        protected void onPostExecute(String file_url) {
+            searchedRoute();
+        }
+
+        private void searchedRoute() {
+            if (pontos != null) {
+                for (int i = 0; i < pontos.size() - 1; i++) {
+                    LatLng src = pontos.get(i);
+                    LatLng dest = pontos.get(i + 1);
+                    try {
+                        //here is where it will draw the polyline in your map
+                        Polyline line = getMap().addPolyline(new PolylineOptions()
+                                .add(new LatLng(src.latitude, src.longitude),
+                                        new LatLng(dest.latitude, dest.longitude))
+                                .width(10).color(Color.BLUE).geodesic(true));
+
+                        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                        builder.include(src);
+                        builder.include(dest);
+                        LatLngBounds bounds = builder.build();
+                        CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, 0);
+                        getMap().animateCamera(cu);
+                    } catch (NullPointerException e) {
+                        Log.e("Error", "NullPointerException onPostExecute: " + e.toString());
+                    } catch (Exception e2) {
+                        Log.e("Error", "Exception onPostExecute: " + e2.toString());
+                    }
+
+                }
+                dialog.dismiss();
+
+            }
+        }
+    }
+
+
+    private List<LatLng> decodePoly(String encoded) {
+
+        List<LatLng> poly = new ArrayList<LatLng>();
+        int index = 0, len = encoded.length();
+        int lat = 0, lng = 0;
+
+        while (index < len) {
+            int b, shift = 0, result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lat += dlat;
+
+            shift = 0;
+            result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lng += dlng;
+
+            LatLng p = new LatLng((((double) lat / 1E5)),
+                    (((double) lng / 1E5)));
+            poly.add(p);
+        }
+
+        return poly;
     }
 }
