@@ -1,30 +1,42 @@
 package com.example.mapapplication;
 
+import android.Manifest;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Address;
 import android.location.Criteria;
 import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Bundle;
+import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.Fragment;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapView;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
-import com.google.maps.android.PolyUtil;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -37,31 +49,74 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnClickListener {
 
+public class MapFragment extends Fragment implements OnMapReadyCallback, View.OnClickListener {
+
+    private GoogleMap mMap;
     private EditText startDest;
     private EditText endDest;
     private Button search;
     private ProgressDialog dialog;
 
-    @Override
-    protected void initViews() {
-        startDest = findViewById(R.id.start_dest_edittext);
-        endDest = findViewById(R.id.end_dest_edittext);
-        search = findViewById(R.id.submit);
-        search.setOnClickListener(PolyDecodeDemoActivity.this);
+    public MapFragment() {
     }
 
     @Override
-    protected void startDemo() {
-        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_map, container, false);
+    }
+
+    @Override
+    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        initViews();
+    }
+
+    protected void initViews() {
+        startDest = getActivity().findViewById(R.id.start_dest_edittext);
+        endDest = getActivity().findViewById(R.id.end_dest_edittext);
+        search = getActivity().findViewById(R.id.submit);
+        search.setOnClickListener(MapFragment.this);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        ((SupportMapFragment) getActivity().getSupportFragmentManager().findFragmentById(R.id.map)).getMapAsync(this);
+    }
+
+    @Override
+    public void onMapReady(GoogleMap map) {
+        if (mMap != null) {
+            return;
+        }
+        mMap = map;
+        LocationManager locationManager = (LocationManager) getActivity().getSystemService(Context.LOCATION_SERVICE);
         Criteria criteria = new Criteria();
 
+        if (ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            Toast.makeText(getActivity(), "Permission Denied", Toast.LENGTH_SHORT).show();
+            return;
+        }
         Location location = locationManager.getLastKnownLocation(locationManager.getBestProvider(criteria, false));
         if (location != null)
         {
             LatLng current = new LatLng(location.getLatitude(), location.getLongitude());
-            getMap().animateCamera(CameraUpdateFactory.newLatLngZoom(current, 13));
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, 13));
 
             CameraPosition cameraPosition = new CameraPosition.Builder()
                     .target(new LatLng(location.getLatitude(), location.getLongitude()))      // Sets the center of the map to location user
@@ -69,8 +124,8 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
                     .bearing(0)                // Sets the orientation of the camera to east
                     .tilt(40)                   // Sets the tilt of the camera to 30 degrees
                     .build();                   // Creates a CameraPosition from the builder
-            getMap().animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
-            getMap().addMarker(new MarkerOptions().position(current));
+            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+            mMap.addMarker(new MarkerOptions().position(current));
         }
     }
 
@@ -89,8 +144,8 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
 
                     LatLng start = new LatLng(latLong[0], latLong[1]);
                     path.add(start);
-                    getMap().addMarker(new MarkerOptions().position(start).title(startDest.getText().toString()));
-                    getMap().moveCamera(CameraUpdateFactory.newLatLng(start));
+                    mMap.addMarker(new MarkerOptions().position(start).title(startDest.getText().toString()));
+                    mMap.moveCamera(CameraUpdateFactory.newLatLng(start));
                 }
 
                 if (!endDest.getText().toString().trim().equals("")) {
@@ -103,7 +158,7 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
 
                     LatLng end = new LatLng(latLong[0], latLong[1]);
                     path.add(end);
-                    getMap().addMarker(new MarkerOptions().position(end).title(endDest.getText().toString()));
+                    mMap.addMarker(new MarkerOptions().position(end).title(endDest.getText().toString()));
                 }
 
                 if(!TextUtils.isEmpty(startDest.getText().toString()) && !TextUtils.isEmpty(endDest.getText().toString())){
@@ -114,7 +169,7 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
     }
 
     private Double[] getLatLongFromAddress(String add) throws IOException {
-        Geocoder gc = new Geocoder(this);
+        Geocoder gc = new Geocoder(getActivity());
         Double[] latLong = new Double[2];
         if (gc.isPresent()) {
             List<Address> list = gc.getFromLocationName(add, 1);
@@ -139,7 +194,7 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            dialog = new ProgressDialog(PolyDecodeDemoActivity.this);
+            dialog = new ProgressDialog(getActivity());
             dialog.setMessage("Drawing the route, please wait!");
             dialog.setIndeterminate(false);
             dialog.setCancelable(false);
@@ -198,7 +253,7 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
                     LatLng dest = pontos.get(i + 1);
                     try {
                         //here is where it will draw the polyline in your map
-                        Polyline line = getMap().addPolyline(new PolylineOptions()
+                        Polyline line = mMap.addPolyline(new PolylineOptions()
                                 .add(new LatLng(src.latitude, src.longitude),
                                         new LatLng(dest.latitude, dest.longitude))
                                 .width(10).color(Color.BLUE).geodesic(true));
@@ -208,7 +263,7 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
                         builder.include(dest);
                         LatLngBounds bounds = builder.build();
                         CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, 0);
-                        getMap().animateCamera(cu);
+                        mMap.animateCamera(cu);
                     } catch (NullPointerException e) {
                         Log.e("Error", "NullPointerException onPostExecute: " + e.toString());
                     } catch (Exception e2) {
@@ -255,4 +310,23 @@ public class PolyDecodeDemoActivity extends BaseDemoActivity implements View.OnC
 
         return poly;
     }
+
+    @Override
+    public void onPause() {
+        mapView.onPause();
+        super.onPause();
+    }
+
+    @Override
+    public void onDestroy() {
+        mapView.onDestroy();
+        super.onDestroy();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        mapView.onLowMemory();
+    }
+
 }

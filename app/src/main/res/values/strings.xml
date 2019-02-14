@@ -3,4 +3,7 @@
     <string name="title_activity_maps">Map</string>
     <string name="enter_start_destination">Enter Start Destination</string>
     <string name="enter_end_distination">Enter end distination</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>
